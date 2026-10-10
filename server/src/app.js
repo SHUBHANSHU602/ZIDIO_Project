@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import actionItemRoutes from "./routes/actionItemRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import meetingRoutes from "./routes/meetingRoutes.js";
 import taskRoutes from "./routes/taskRoutes.js";
@@ -30,6 +31,7 @@ export function createApp() {
   app.use("/api/teams", teamRoutes);
   app.use("/api/meetings", meetingRoutes);
   app.use("/api/tasks", taskRoutes);
+  app.use("/api", actionItemRoutes);
 
   app.use(notFound);
   app.use(errorHandler);
