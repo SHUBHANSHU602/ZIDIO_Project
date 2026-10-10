@@ -2,6 +2,9 @@ import mongoose from "mongoose";
 import { Meeting } from "../models/Meeting.js";
 import { Team } from "../models/Team.js";
 import { HttpError } from "../utils/httpError.js";
+import { deleteKey, getJson, setJson } from "./cacheService.js";
+
+const meetingCacheKey = (meetingId, userId) => `meeting:${meetingId}:viewer:${userId}`;
 
 function assertId(id, label = "id") {
   if (!mongoose.isValidObjectId(id)) throw new HttpError(400, `Invalid ${label}`);
@@ -41,6 +44,11 @@ export async function listMeetings(userId) {
 
 export async function getMeeting(userId, meetingId) {
   assertId(meetingId, "meeting id");
+
+  const cacheKey = meetingCacheKey(meetingId, userId);
+  const cached = await getJson(cacheKey);
+  if (cached) return cached;
+
   const meeting = await Meeting.findOne({
     _id: meetingId,
     $or: [{ host: userId }, { participants: userId }],
@@ -50,7 +58,10 @@ export async function getMeeting(userId, meetingId) {
     .populate("team", "name");
 
   if (!meeting) throw new HttpError(404, "Meeting not found");
-  return meeting;
+
+  const serialized = meeting.toJSON();
+  await setJson(cacheKey, serialized, 60);
+  return serialized;
 }
 
 export async function updateMeeting(userId, meetingId, payload) {
@@ -67,6 +78,7 @@ export async function updateMeeting(userId, meetingId, payload) {
   );
 
   if (!meeting) throw new HttpError(404, "Meeting not found or you are not the host");
+  await deleteKey(meetingCacheKey(meetingId, userId));
   return meeting;
 }
 
@@ -74,4 +86,5 @@ export async function deleteMeeting(userId, meetingId) {
   assertId(meetingId, "meeting id");
   const meeting = await Meeting.findOneAndDelete({ _id: meetingId, host: userId });
   if (!meeting) throw new HttpError(404, "Meeting not found or you are not the host");
+  await deleteKey(meetingCacheKey(meetingId, userId));
 }
