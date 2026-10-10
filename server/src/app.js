@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import authRoutes from "./routes/authRoutes.js";
+import { errorHandler, notFound } from "./middleware/errorHandler.js";
 
 export function createApp() {
   const app = express();
@@ -20,6 +22,11 @@ export function createApp() {
       status: "ok",
     });
   });
+
+  app.use("/api/auth", authRoutes);
+
+  app.use(notFound);
+  app.use(errorHandler);
 
   return app;
 }
