@@ -6,6 +6,7 @@ import authRoutes from "./routes/authRoutes.js";
 import meetingRoutes from "./routes/meetingRoutes.js";
 import taskRoutes from "./routes/taskRoutes.js";
 import teamRoutes from "./routes/teamRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
 
 export function createApp() {
@@ -28,6 +29,7 @@ export function createApp() {
   });
 
   app.use("/api/auth", authRoutes);
+  app.use("/api/users", userRoutes);
   app.use("/api/teams", teamRoutes);
   app.use("/api/meetings", meetingRoutes);
   app.use("/api/tasks", taskRoutes);
