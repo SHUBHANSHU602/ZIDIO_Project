@@ -27,7 +27,7 @@ export async function createActionItem(userId, meetingId, payload) {
     text: payload.text.trim(),
     assignee: payload.assignee ?? null,
     dueAt: payload.dueAt ?? null,
-    source: payload.source === "AI" ? "AI" : "MANUAL",
+    source: "MANUAL",
   });
 }
 
