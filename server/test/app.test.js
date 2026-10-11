@@ -35,3 +35,12 @@ test("registration validates input before database work", async () => {
   assert.equal(response.status, 400);
   assert.equal(response.body.success, false);
 });
+
+test("media upload signature endpoint is protected", async () => {
+  const response = await request(app)
+    .post("/api/media/signature")
+    .send({ purpose: "avatar" });
+
+  assert.equal(response.status, 401);
+  assert.equal(response.body.success, false);
+});
