@@ -6,6 +6,13 @@ import { deleteKey, getJson, setJson } from "./cacheService.js";
 
 const meetingCacheKey = (meetingId, userId) => `meeting:${meetingId}:viewer:${userId}`;
 
+const STATUS_TRANSITIONS = {
+  SCHEDULED: new Set(["LIVE", "CANCELLED"]),
+  LIVE: new Set(["ENDED"]),
+  ENDED: new Set(),
+  CANCELLED: new Set(),
+};
+
 function assertId(id, label = "id") {
   if (!mongoose.isValidObjectId(id)) throw new HttpError(400, `Invalid ${label}`);
 }
@@ -24,7 +31,7 @@ export async function createMeeting(userId, payload) {
   await assertTeamAccess(payload.team, userId);
 
   return Meeting.create({
-    title: payload.title?.trim(),
+    title: payload.title.trim(),
     description: payload.description?.trim() ?? "",
     host: userId,
     team: payload.team ?? null,
@@ -38,6 +45,7 @@ export async function listMeetings(userId) {
     $or: [{ host: userId }, { participants: userId }],
   })
     .sort({ createdAt: -1 })
+    .limit(100)
     .populate("host", "name email")
     .populate("team", "name");
 }
@@ -66,25 +74,34 @@ export async function getMeeting(userId, meetingId) {
 
 export async function updateMeeting(userId, meetingId, payload) {
   assertId(meetingId, "meeting id");
-  const allowed = ["title", "description", "scheduledAt", "status"];
-  const update = Object.fromEntries(
-    Object.entries(payload).filter(([key]) => allowed.includes(key))
-  );
-
-  const meeting = await Meeting.findOneAndUpdate(
-    { _id: meetingId, host: userId },
-    { $set: update },
-    { new: true, runValidators: true }
-  );
-
+  const meeting = await Meeting.findOne({ _id: meetingId, host: userId });
   if (!meeting) throw new HttpError(404, "Meeting not found or you are not the host");
+
+  if (payload.status && payload.status !== meeting.status) {
+    if (!STATUS_TRANSITIONS[meeting.status]?.has(payload.status)) {
+      throw new HttpError(409, `Invalid meeting status transition: ${meeting.status} -> ${payload.status}`);
+    }
+
+    if (payload.status === "LIVE" && !meeting.startedAt) meeting.startedAt = new Date();
+    if (payload.status === "ENDED" && !meeting.endedAt) meeting.endedAt = new Date();
+  }
+
+  const allowed = ["title", "description", "scheduledAt", "status"];
+  for (const key of allowed) {
+    if (payload[key] !== undefined) meeting[key] = payload[key];
+  }
+
+  await meeting.save();
   await deleteKey(meetingCacheKey(meetingId, userId));
   return meeting;
 }
 
 export async function deleteMeeting(userId, meetingId) {
   assertId(meetingId, "meeting id");
-  const meeting = await Meeting.findOneAndDelete({ _id: meetingId, host: userId });
+  const meeting = await Meeting.findOne({ _id: meetingId, host: userId });
   if (!meeting) throw new HttpError(404, "Meeting not found or you are not the host");
+  if (meeting.status === "LIVE") throw new HttpError(409, "A live meeting cannot be deleted");
+
+  await meeting.deleteOne();
   await deleteKey(meetingCacheKey(meetingId, userId));
 }

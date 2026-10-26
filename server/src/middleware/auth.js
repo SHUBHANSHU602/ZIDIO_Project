@@ -11,7 +11,11 @@ export function requireAuth(req, _res, next) {
 
   try {
     const payload = verifyAccessToken(token);
-    req.auth = { userId: payload.sub, role: payload.role };
+    req.auth = {
+      userId: payload.sub,
+      role: payload.role,
+      sessionId: payload.sid,
+    };
     next();
   } catch {
     next(new HttpError(401, "Invalid or expired access token"));

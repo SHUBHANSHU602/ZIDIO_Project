@@ -9,7 +9,7 @@ function assertId(id, label = "id") {
 
 export async function createTeam(ownerId, payload) {
   const team = await Team.create({
-    name: payload.name?.trim(),
+    name: payload.name.trim(),
     owner: ownerId,
     members: [ownerId],
   });
@@ -25,6 +25,26 @@ export async function getTeamForMember(teamId, userId) {
 
   if (!team) throw new HttpError(404, "Team not found");
   return team;
+}
+
+export async function requireTeamMembership(teamId, userId) {
+  assertId(teamId, "team id");
+  const team = await Team.findOne({
+    _id: teamId,
+    $or: [{ owner: userId }, { members: userId }],
+  });
+  if (!team) throw new HttpError(403, "You do not have access to this team");
+  return team;
+}
+
+export async function assertUserBelongsToTeam(teamId, userId, label = "user") {
+  if (!userId) return;
+  assertId(userId, `${label} id`);
+  const member = await Team.exists({
+    _id: teamId,
+    $or: [{ owner: userId }, { members: userId }],
+  });
+  if (!member) throw new HttpError(422, `${label} must belong to the team`);
 }
 
 export async function addTeamMember(teamId, ownerId, email) {

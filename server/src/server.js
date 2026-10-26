@@ -1,7 +1,10 @@
 import "dotenv/config";
+import http from "node:http";
 import { createApp } from "./app.js";
 import { connectDatabase, disconnectDatabase } from "./config/db.js";
 import { connectRedis, disconnectRedis } from "./config/redis.js";
+import { disconnectSocketRedisAdapter } from "./realtime/redisAdapter.js";
+import { initializeRealtime } from "./realtime/socketServer.js";
 
 const port = Number(process.env.PORT || 5000);
 
@@ -10,7 +13,10 @@ async function start() {
   await connectRedis();
 
   const app = createApp();
-  const server = app.listen(port, () => {
+  const server = http.createServer(app);
+  await initializeRealtime(server);
+
+  server.listen(port, () => {
     console.log(`IntellMeet API listening on port ${port}`);
   });
 
@@ -21,7 +27,11 @@ async function start() {
 
     console.log(`${signal} received, shutting down`);
     server.close(async () => {
-      await Promise.allSettled([disconnectRedis(), disconnectDatabase()]);
+      await Promise.allSettled([
+        disconnectSocketRedisAdapter(),
+        disconnectRedis(),
+        disconnectDatabase(),
+      ]);
       process.exit(0);
     });
   };
