@@ -1,25 +1,30 @@
 import mongoose from "mongoose";
+import { Meeting } from "../models/Meeting.js";
 import { Task } from "../models/Task.js";
-import { Team } from "../models/Team.js";
 import { HttpError } from "../utils/httpError.js";
+import { assertUserBelongsToTeam, requireTeamMembership } from "./teamService.js";
 
 function assertId(id, label = "id") {
   if (!mongoose.isValidObjectId(id)) throw new HttpError(400, `Invalid ${label}`);
 }
 
-async function requireTeamMembership(teamId, userId) {
-  assertId(teamId, "team id");
-  const member = await Team.exists({
-    _id: teamId,
-    $or: [{ owner: userId }, { members: userId }],
-  });
-  if (!member) throw new HttpError(403, "You do not have access to this team");
+async function validateTaskRelationships(payload, teamId) {
+  if (payload.assignee) {
+    await assertUserBelongsToTeam(teamId, payload.assignee, "assignee");
+  }
+
+  if (payload.meeting) {
+    const meeting = await Meeting.exists({ _id: payload.meeting, team: teamId });
+    if (!meeting) throw new HttpError(422, "meeting must belong to the same team");
+  }
 }
 
 export async function createTask(userId, payload) {
   await requireTeamMembership(payload.team, userId);
+  await validateTaskRelationships(payload, payload.team);
+
   return Task.create({
-    title: payload.title?.trim(),
+    title: payload.title.trim(),
     description: payload.description?.trim() ?? "",
     team: payload.team,
     meeting: payload.meeting ?? null,
@@ -43,10 +48,15 @@ export async function updateTask(userId, taskId, payload) {
   if (!task) throw new HttpError(404, "Task not found");
 
   await requireTeamMembership(task.team, userId);
+  if (payload.assignee !== undefined && payload.assignee !== null) {
+    await assertUserBelongsToTeam(task.team, payload.assignee, "assignee");
+  }
+
   const allowed = ["title", "description", "assignee", "status", "dueAt"];
   for (const key of allowed) {
     if (payload[key] !== undefined) task[key] = payload[key];
   }
+
   await task.save();
   return task;
 }
@@ -56,6 +66,12 @@ export async function deleteTask(userId, taskId) {
   const task = await Task.findById(taskId);
   if (!task) throw new HttpError(404, "Task not found");
 
-  await requireTeamMembership(task.team, userId);
+  const team = await requireTeamMembership(task.team, userId);
+  const isOwner = String(team.owner) === String(userId);
+  const isCreator = String(task.createdBy) === String(userId);
+  if (!isOwner && !isCreator) {
+    throw new HttpError(403, "Only the team owner or task creator can delete this task");
+  }
+
   await task.deleteOne();
 }
