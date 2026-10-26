@@ -10,6 +10,7 @@ import meetingRoutes from "./routes/meetingRoutes.js";
 import recordingRoutes from "./routes/recordingRoutes.js";
 import taskRoutes from "./routes/taskRoutes.js";
 import teamRoutes from "./routes/teamRoutes.js";
+import transcriptionRoutes from "./routes/transcriptionRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
 
@@ -57,6 +58,7 @@ export function createApp() {
   app.use("/api/meetings", meetingRoutes);
   app.use("/api/tasks", taskRoutes);
   app.use("/api/media", mediaRoutes);
+  app.use("/api", transcriptionRoutes);
   app.use("/api", recordingRoutes);
   app.use("/api", chatRoutes);
   app.use("/api", actionItemRoutes);
