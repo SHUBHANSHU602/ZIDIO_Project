@@ -4,6 +4,7 @@ import cors from "cors";
 import helmet from "helmet";
 import actionItemRoutes from "./routes/actionItemRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
+import chatRoutes from "./routes/chatRoutes.js";
 import mediaRoutes from "./routes/mediaRoutes.js";
 import meetingRoutes from "./routes/meetingRoutes.js";
 import taskRoutes from "./routes/taskRoutes.js";
@@ -55,6 +56,7 @@ export function createApp() {
   app.use("/api/meetings", meetingRoutes);
   app.use("/api/tasks", taskRoutes);
   app.use("/api/media", mediaRoutes);
+  app.use("/api", chatRoutes);
   app.use("/api", actionItemRoutes);
 
   app.use(notFound);
