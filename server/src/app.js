@@ -6,6 +6,7 @@ import actionItemRoutes from "./routes/actionItemRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
 import mediaRoutes from "./routes/mediaRoutes.js";
+import meetingInsightRoutes from "./routes/meetingInsightRoutes.js";
 import meetingRoutes from "./routes/meetingRoutes.js";
 import recordingRoutes from "./routes/recordingRoutes.js";
 import taskRoutes from "./routes/taskRoutes.js";
@@ -30,7 +31,6 @@ function resolveCorsOrigin(origin, callback) {
 
 export function createApp() {
   const app = express();
-
   app.disable("x-powered-by");
   if (process.env.TRUST_PROXY === "true") app.set("trust proxy", 1);
 
@@ -45,11 +45,7 @@ export function createApp() {
   app.use(cookieParser());
 
   app.get("/health", (_req, res) => {
-    res.status(200).json({
-      success: true,
-      service: "intellmeet-api",
-      status: "ok",
-    });
+    res.status(200).json({ success: true, service: "intellmeet-api", status: "ok" });
   });
 
   app.use("/api/auth", authRoutes);
@@ -58,6 +54,7 @@ export function createApp() {
   app.use("/api/meetings", meetingRoutes);
   app.use("/api/tasks", taskRoutes);
   app.use("/api/media", mediaRoutes);
+  app.use("/api", meetingInsightRoutes);
   app.use("/api", transcriptionRoutes);
   app.use("/api", recordingRoutes);
   app.use("/api", chatRoutes);
@@ -65,6 +62,5 @@ export function createApp() {
 
   app.use(notFound);
   app.use(errorHandler);
-
   return app;
 }
