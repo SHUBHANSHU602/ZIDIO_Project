@@ -1,8 +1,51 @@
-import { ArrowUpRight, ChevronDown, BrainCircuit } from 'lucide-react'
-import Avatar from '../../components/common/Avatar'
-import Badge from '../../components/common/Badge'
+import { useEffect, useMemo, useState } from 'react'
+import { BrainCircuit } from 'lucide-react'
+import { ApiError } from '../../api/client'
+import { getAnalytics } from '../../api/analytics'
+import type { AnalyticsData } from '../../api/analytics'
 
 export default function AnalyticsPage() {
-  const bars=[42,58,46,76,61,89,68,54,79,65,94,73]
-  return <><div className="stats-grid analytics-stats"><div className="stat-card"><span className="stat-label">Total meetings</span><div className="stat-value">108 <span className="stat-trend"><ArrowUpRight size={14}/> 18.2%</span></div><small className="stat-foot">Compared to last month</small></div><div className="stat-card"><span className="stat-label">Avg. meeting length</span><div className="stat-value">34 <small>min</small></div><small className="stat-foot">↓ 6 min from last month</small></div><div className="stat-card"><span className="stat-label">AI time saved</span><div className="stat-value">21.4 <small>hrs</small></div><small className="stat-foot">Across your workspace</small></div><div className="stat-card"><span className="stat-label">Action completion</span><div className="stat-value">82<span className="percent">%</span></div><small className="stat-foot">↑ 9% completion rate</small></div></div><div className="analytics-grid"><section className="panel chart-panel"><div className="panel-heading"><div><h3>Meeting activity</h3><p>Meeting hours over the last 12 weeks</p></div><button className="button button-secondary button-small">Last 12 weeks <ChevronDown size={14}/></button></div><div className="chart-legend"><span/><small>Meeting hours</small></div><div className="bar-chart">{bars.map((v,i)=><div className="bar-column" key={i}><div className="bar-value" style={{height:`${v}%`}}/><small>{['W1','W2','W3','W4','W5','W6','W7','W8','W9','W10','W11','W12'][i]}</small></div>)}</div></section><section className="panel"><div className="panel-heading"><div><h3>Meeting types</h3><p>Breakdown by category</p></div></div><div className="donut-wrap"><div className="donut"><div><b>108</b><small>meetings</small></div></div></div><div className="legend-list"><div><i className="legend-purple"/><span>Team sync</span><b>42%</b></div><div><i className="legend-green"/><span>Project review</span><b>28%</b></div><div><i className="legend-orange"/><span>Planning</span><b>18%</b></div><div><i className="legend-blue"/><span>Other</span><b>12%</b></div></div></section></div><div className="panel analytics-insight"><span className="ai-emblem"><BrainCircuit size={20}/></span><div><b>Insight from IntellMeet AI</b><p>Your team has shortened average meeting time by 15% while increasing action-item completion. Consider protecting two focus blocks each week to maintain momentum.</p></div></div></>
+  const [data,setData]=useState<AnalyticsData|null>(null)
+  const [error,setError]=useState('')
+
+  useEffect(()=>{
+    let active=true
+    getAnalytics()
+      .then(value=>active&&setData(value))
+      .catch(err=>active&&setError(err instanceof ApiError?err.message:'Could not load analytics'))
+    return()=>{active=false}
+  },[])
+
+  const maxMinutes=useMemo(()=>Math.max(1,...(data?.weekly.map(item=>item.meetingMinutes)||[1])),[data])
+
+  if(error)return <div className="panel empty-state">{error}</div>
+  if(!data)return <div className="panel empty-state">Loading analytics…</div>
+
+  const statusTotal=Math.max(1,Object.values(data.statusBreakdown).reduce((sum,value)=>sum+value,0))
+
+  return <>
+    <div className="stats-grid analytics-stats">
+      <div className="stat-card"><span className="stat-label">Total meetings</span><div className="stat-value">{data.totals.meetings}</div><small className="stat-foot">{data.totals.completedMeetings} completed</small></div>
+      <div className="stat-card"><span className="stat-label">Avg. measured length</span><div className="stat-value">{data.totals.avgMeetingMinutes} <small>min</small></div><small className="stat-foot">Completed meetings with start/end timestamps</small></div>
+      <div className="stat-card"><span className="stat-label">AI processed meetings</span><div className="stat-value">{data.totals.meetingsWithAI}</div><small className="stat-foot">Completed structured meeting insights</small></div>
+      <div className="stat-card"><span className="stat-label">Action completion</span><div className="stat-value">{data.totals.actionCompletionRate}<span className="percent">%</span></div><small className="stat-foot">{data.totals.completedActionItems}/{data.totals.actionItems} non-dismissed actions done</small></div>
+    </div>
+
+    <div className="analytics-grid">
+      <section className="panel chart-panel">
+        <div className="panel-heading"><div><h3>Meeting activity</h3><p>Measured meeting minutes over the last 12 weeks</p></div></div>
+        <div className="chart-legend"><span/><small>Meeting minutes</small></div>
+        <div className="bar-chart">{data.weekly.map((item,index)=><div className="bar-column" key={item.weekStart}><div className="bar-value" style={{height:`${Math.round((item.meetingMinutes/maxMinutes)*100)}%`}}/><small>W{index+1}</small></div>)}</div>
+      </section>
+      <section className="panel">
+        <div className="panel-heading"><div><h3>Meeting status</h3><p>Current persisted meeting lifecycle</p></div></div>
+        <div className="donut-wrap"><div className="donut"><div><b>{data.totals.meetings}</b><small>meetings</small></div></div></div>
+        <div className="legend-list">
+          {Object.entries(data.statusBreakdown).map(([status,count],index)=><div key={status}><i className={['legend-purple','legend-green','legend-orange','legend-blue'][index]}/><span>{status}</span><b>{Math.round((count/statusTotal)*100)}%</b></div>)}
+        </div>
+      </section>
+    </div>
+
+    <div className="panel analytics-insight"><span className="ai-emblem"><BrainCircuit size={20}/></span><div><b>Evidence-based analytics</b><p>These metrics are calculated from persisted meeting timestamps, lifecycle states, AI insight records and action-item completion. IntellMeet does not display invented productivity or “time saved” estimates.</p></div></div>
+  </>
 }

@@ -3,6 +3,7 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import helmet from "helmet";
 import actionItemRoutes from "./routes/actionItemRoutes.js";
+import analyticsRoutes from "./routes/analyticsRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
 import mediaRoutes from "./routes/mediaRoutes.js";
@@ -31,6 +32,7 @@ export function createApp(){
  app.get("/health",(_req,res)=>res.status(200).json({success:true,service:"intellmeet-api",status:"ok"}));
  app.use("/api/auth",authRoutes);
  app.use("/api/users",userRoutes);
+ app.use("/api/analytics",analyticsRoutes);
  app.use("/api/teams",teamRoutes);
  app.use("/api/workspaces",workspaceRoutes);
  app.use("/api/meetings",meetingRoutes);
