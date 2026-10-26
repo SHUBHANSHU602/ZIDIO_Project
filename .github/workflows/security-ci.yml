@@ -1,0 +1,39 @@
+name: Security CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install backend dependencies
+        working-directory: server
+        run: npm install --ignore-scripts
+
+      - name: Audit backend critical vulnerabilities
+        working-directory: server
+        run: npm audit --audit-level=critical
+
+      - name: Install frontend dependencies
+        working-directory: IntellMeet-Frontend
+        run: npm ci
+
+      - name: Audit frontend critical vulnerabilities
+        working-directory: IntellMeet-Frontend
+        run: npm audit --audit-level=critical
