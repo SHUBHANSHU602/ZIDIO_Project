@@ -1,4 +1,5 @@
 import express from "express";
+import cookieParser from "cookie-parser";
 import cors from "cors";
 import helmet from "helmet";
 import actionItemRoutes from "./routes/actionItemRoutes.js";
@@ -10,16 +11,35 @@ import teamRoutes from "./routes/teamRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
 
+function resolveCorsOrigin(origin, callback) {
+  const allowedOrigins = (process.env.CLIENT_ORIGIN || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  if (!origin || (process.env.NODE_ENV !== "production" && allowedOrigins.length === 0)) {
+    return callback(null, true);
+  }
+
+  if (allowedOrigins.includes(origin)) return callback(null, true);
+  return callback(new Error("Origin is not allowed by CORS"));
+}
+
 export function createApp() {
   const app = express();
 
   app.disable("x-powered-by");
+  if (process.env.TRUST_PROXY === "true") app.set("trust proxy", 1);
+
   app.use(helmet());
   app.use(cors({
-    origin: process.env.CLIENT_ORIGIN?.split(",") ?? true,
+    origin: resolveCorsOrigin,
     credentials: true,
+    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Request-Id"],
   }));
   app.use(express.json({ limit: "1mb" }));
+  app.use(cookieParser());
 
   app.get("/health", (_req, res) => {
     res.status(200).json({
