@@ -1,0 +1,40 @@
+name: Deployment CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - "deploy/**"
+      - "IntellMeet-Frontend/Dockerfile"
+      - "IntellMeet-Frontend/nginx.conf"
+      - ".github/workflows/deployment-ci.yml"
+      - ".github/workflows/platform-delivery.yml"
+      - ".github/workflows/deploy-production.yml"
+  push:
+    branches: [develop]
+    paths:
+      - "deploy/**"
+      - ".github/workflows/deployment-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.17.0
+      - name: Helm lint
+        run: helm lint deploy/helm/intellmeet
+      - name: Render manifests
+        run: helm template intellmeet deploy/helm/intellmeet --set ingress.host=intellmeet.example.com >/tmp/intellmeet.yaml
+
+  frontend-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build frontend image
+        run: docker build -t intellmeet-web:test IntellMeet-Frontend

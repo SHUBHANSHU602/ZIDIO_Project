@@ -1,0 +1,44 @@
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Image tag to deploy (for example sha-<commit>)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.17.0
+      - name: Configure kubeconfig
+        env:
+          KUBE_CONFIG_B64: ${{ secrets.KUBE_CONFIG_B64 }}
+        run: |
+          test -n "$KUBE_CONFIG_B64"
+          mkdir -p "$HOME/.kube"
+          echo "$KUBE_CONFIG_B64" | base64 -d > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+      - name: Deploy with Helm
+        env:
+          PROD_HOST: ${{ vars.PROD_HOST }}
+        run: |
+          test -n "$PROD_HOST"
+          helm upgrade --install intellmeet deploy/helm/intellmeet             --namespace intellmeet             --create-namespace             --atomic             --timeout 10m             --set-string backend.image.tag="${{ inputs.image_tag }}"             --set-string frontend.image.tag="${{ inputs.image_tag }}"             --set-string ingress.host="$PROD_HOST"
+      - name: Verify rollout
+        run: |
+          kubectl -n intellmeet rollout status deployment/intellmeet-intellmeet-backend --timeout=5m
+          kubectl -n intellmeet rollout status deployment/intellmeet-intellmeet-frontend --timeout=5m
