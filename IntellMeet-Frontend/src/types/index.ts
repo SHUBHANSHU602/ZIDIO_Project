@@ -30,3 +30,57 @@ export type Meeting = {
   color: string
   status: string
 }
+
+export type TranscriptSegment = {
+  startMs: number
+  endMs: number
+  text: string
+  speaker?: string
+}
+
+export type PostMeetingDashboard = {
+  meeting: BackendMeeting & { durationSeconds?: number | null }
+  intelligence: null | {
+    status: 'PROCESSING' | 'COMPLETED' | 'FAILED'
+    summary: string
+    decisions: string[]
+    provider: string
+    model: string
+    completedAt?: string | null
+  }
+  transcript: null | {
+    text: string
+    language: string
+    durationSeconds: number
+    segments: TranscriptSegment[]
+  }
+  actionItems: Array<{
+    _id: string
+    text: string
+    status: 'OPEN' | 'DONE' | 'DISMISSED'
+    source: 'AI' | 'MANUAL'
+    assignee?: User | null
+    dueAt?: string | null
+  }>
+  recordings: Array<{
+    _id: string
+    secureUrl: string
+    format: string
+    bytes: number
+    durationSeconds: number
+    createdAt: string
+  }>
+  notes: null | {
+    content: string
+    revision: number
+    updatedAt: string
+    lastEditedBy?: User
+  }
+  activity: {
+    chatMessageCount: number
+    participantCount: number
+    actionItemCount: number
+    completedActionItemCount: number
+    recordingCount: number
+  }
+}
