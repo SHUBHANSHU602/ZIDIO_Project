@@ -1,0 +1,27 @@
+name: Documentation CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - "README.md"
+      - "docs/**"
+      - ".github/workflows/docs-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  required-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify evaluator documentation
+        run: |
+          test -s README.md
+          test -s docs/ARCHITECTURE.md
+          test -s docs/API_REFERENCE.md
+          test -s docs/DEMO_RUNBOOK.md
+          test -s docs/EVALUATION_CHECKLIST.md
+          grep -q "Known limitations" README.md
+          grep -q "Scale targets from brief" docs/EVALUATION_CHECKLIST.md
