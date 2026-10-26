@@ -5,6 +5,7 @@ import { getJoinableMeeting, requireMeetingParticipant } from "../services/meeti
 import { authenticateSocket } from "./socketAuth.js";
 import { createSocketRateLimiter } from "./rateLimiter.js";
 import { configureSocketRedisAdapter } from "./redisAdapter.js";
+import { validateMediaState, validateSignalPayload } from "./webrtc.js";
 
 const roomName = (meetingId) => `meeting:${meetingId}`;
 const allowEvent = createSocketRateLimiter();
@@ -19,6 +20,33 @@ function serializeError(error) {
     ok: false,
     error: status >= 500 ? "Realtime operation failed" : error?.message || "Realtime operation failed",
   };
+}
+
+async function relaySignal(io, socket, joinedMeetings, type, payload, ack) {
+  try {
+    if (!allowEvent(`${socket.id}:webrtc`)) throw new Error("Too many signaling requests");
+    const signal = validateSignalPayload(type, payload);
+    if (!joinedMeetings.has(signal.meetingId)) throw new Error("Join the meeting before signaling");
+
+    const targetSocket = io.sockets.sockets.get(signal.targetSocketId);
+    if (!targetSocket || !targetSocket.rooms.has(roomName(signal.meetingId))) {
+      throw new Error("Target participant is not in this meeting");
+    }
+    if (targetSocket.id === socket.id) throw new Error("Cannot signal yourself");
+
+    const outbound = {
+      meetingId: signal.meetingId,
+      fromSocketId: socket.id,
+      fromUserId: socket.auth.userId,
+    };
+    if (signal.description) outbound.description = signal.description;
+    if (signal.candidate) outbound.candidate = signal.candidate;
+
+    io.to(targetSocket.id).emit(`webrtc:${type}`, outbound);
+    safeAck(ack, { ok: true });
+  } catch (error) {
+    safeAck(ack, serializeError(error));
+  }
 }
 
 export async function initializeRealtime(httpServer) {
@@ -54,12 +82,25 @@ export async function initializeRealtime(httpServer) {
         joinedMeetings.add(meetingId);
 
         const user = await User.findById(socket.auth.userId).select("name email role");
+        const participants = await io.in(roomName(meetingId)).fetchSockets();
+
         socket.to(roomName(meetingId)).emit("participant:joined", {
           meetingId,
+          socketId: socket.id,
           user: user?.toJSON() ?? { _id: socket.auth.userId },
         });
 
-        safeAck(ack, { ok: true, meetingId });
+        safeAck(ack, {
+          ok: true,
+          meetingId,
+          selfSocketId: socket.id,
+          peers: participants
+            .filter((peer) => peer.id !== socket.id)
+            .map((peer) => ({
+              socketId: peer.id,
+              userId: peer.auth?.userId,
+            })),
+        });
       } catch (error) {
         safeAck(ack, serializeError(error));
       }
@@ -73,6 +114,7 @@ export async function initializeRealtime(httpServer) {
       joinedMeetings.delete(meetingId);
       socket.to(roomName(meetingId)).emit("participant:left", {
         meetingId,
+        socketId: socket.id,
         userId: socket.auth.userId,
       });
       safeAck(ack, { ok: true });
@@ -112,24 +154,42 @@ export async function initializeRealtime(httpServer) {
       }
     });
 
-    socket.on("typing:start", (payload) => {
-      const meetingId = payload?.meetingId;
-      if (typeof meetingId === "string" && joinedMeetings.has(meetingId)) {
-        socket.to(roomName(meetingId)).emit("typing:start", { meetingId, userId: socket.auth.userId });
+    socket.on("webrtc:offer", (payload, ack) => relaySignal(io, socket, joinedMeetings, "offer", payload, ack));
+    socket.on("webrtc:answer", (payload, ack) => relaySignal(io, socket, joinedMeetings, "answer", payload, ack));
+    socket.on("webrtc:ice-candidate", (payload, ack) => relaySignal(io, socket, joinedMeetings, "ice-candidate", payload, ack));
+
+    socket.on("media:state", (payload, ack) => {
+      try {
+        if (!allowEvent(`${socket.id}:media`)) throw new Error("Too many media state updates");
+        const { meetingId, state } = validateMediaState(payload);
+        if (!joinedMeetings.has(meetingId)) throw new Error("Join the meeting before updating media state");
+
+        socket.to(roomName(meetingId)).emit("media:state", {
+          meetingId,
+          socketId: socket.id,
+          userId: socket.auth.userId,
+          ...state,
+        });
+        safeAck(ack, { ok: true });
+      } catch (error) {
+        safeAck(ack, serializeError(error));
       }
     });
 
-    socket.on("typing:stop", (payload) => {
-      const meetingId = payload?.meetingId;
-      if (typeof meetingId === "string" && joinedMeetings.has(meetingId)) {
-        socket.to(roomName(meetingId)).emit("typing:stop", { meetingId, userId: socket.auth.userId });
-      }
-    });
+    for (const eventName of ["typing:start", "typing:stop"]) {
+      socket.on(eventName, (payload) => {
+        const meetingId = payload?.meetingId;
+        if (typeof meetingId === "string" && joinedMeetings.has(meetingId)) {
+          socket.to(roomName(meetingId)).emit(eventName, { meetingId, userId: socket.auth.userId });
+        }
+      });
+    }
 
     socket.on("disconnecting", () => {
       for (const meetingId of joinedMeetings) {
         socket.to(roomName(meetingId)).emit("participant:left", {
           meetingId,
+          socketId: socket.id,
           userId: socket.auth.userId,
         });
       }
