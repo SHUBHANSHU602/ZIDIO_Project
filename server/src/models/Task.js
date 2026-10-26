@@ -14,11 +14,12 @@ const taskSchema = new mongoose.Schema(
       default: "TODO",
       index: true,
     },
+    position: { type: Number, min: 0, default: 0, index: true },
     dueAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
 
-taskSchema.index({ team: 1, status: 1, createdAt: -1 });
+taskSchema.index({ team: 1, status: 1, position: 1, createdAt: -1 });
 
 export const Task = mongoose.model("Task", taskSchema);
