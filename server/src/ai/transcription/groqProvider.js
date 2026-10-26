@@ -1,3 +1,4 @@
+/* global FormData, AbortController, fetch */
 import { normalizeTranscriptResult } from "./normalizeTranscript.js";
 
 function required(name) {
