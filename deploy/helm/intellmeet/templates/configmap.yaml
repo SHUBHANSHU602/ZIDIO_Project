@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "intellmeet.fullname" . }}-backend
+  labels:
+    {{- include "intellmeet.labels" . | nindent 4 }}
+data:
+  NODE_ENV: {{ .Values.config.NODE_ENV | quote }}
+  TRUST_PROXY: {{ .Values.config.TRUST_PROXY | quote }}
+  AUTH_COOKIE_SECURE: {{ .Values.config.AUTH_COOKIE_SECURE | quote }}
+  AUTH_COOKIE_SAME_SITE: {{ .Values.config.AUTH_COOKIE_SAME_SITE | quote }}
+  API_RATE_LIMIT_PER_MINUTE: {{ .Values.config.API_RATE_LIMIT_PER_MINUTE | quote }}
+  AI_PROVIDER: {{ .Values.config.AI_PROVIDER | quote }}
+  GROQ_API_BASE_URL: {{ .Values.config.GROQ_API_BASE_URL | quote }}
+  GROQ_TRANSCRIPTION_MODEL: {{ .Values.config.GROQ_TRANSCRIPTION_MODEL | quote }}
+  GROQ_SUMMARY_MODEL: {{ .Values.config.GROQ_SUMMARY_MODEL | quote }}
+  AI_TRANSCRIPTION_TIMEOUT_MS: {{ .Values.config.AI_TRANSCRIPTION_TIMEOUT_MS | quote }}
+  AI_SUMMARY_TIMEOUT_MS: {{ .Values.config.AI_SUMMARY_TIMEOUT_MS | quote }}
+  CLIENT_ORIGIN: {{ printf "https://%s" .Values.ingress.host | quote }}

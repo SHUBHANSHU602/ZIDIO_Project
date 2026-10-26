@@ -1,0 +1,66 @@
+nameOverride: ""
+fullnameOverride: ""
+
+backend:
+  replicaCount: 2
+  image:
+    repository: ghcr.io/shubhanshu602/intellmeet-api
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    port: 5000
+  resources:
+    requests:
+      cpu: 150m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+frontend:
+  replicaCount: 2
+  image:
+    repository: ghcr.io/shubhanshu602/intellmeet-web
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    port: 8080
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+
+config:
+  NODE_ENV: production
+  TRUST_PROXY: "true"
+  AUTH_COOKIE_SECURE: "true"
+  AUTH_COOKIE_SAME_SITE: lax
+  API_RATE_LIMIT_PER_MINUTE: "300"
+  AI_PROVIDER: groq
+  GROQ_API_BASE_URL: https://api.groq.com/openai/v1
+  GROQ_TRANSCRIPTION_MODEL: whisper-large-v3-turbo
+  GROQ_SUMMARY_MODEL: llama-3.3-70b-versatile
+  AI_TRANSCRIPTION_TIMEOUT_MS: "90000"
+  AI_SUMMARY_TIMEOUT_MS: "60000"
+
+existingSecret: intellmeet-secrets
+
+ingress:
+  enabled: true
+  className: nginx
+  host: intellmeet.example.com
+  tls:
+    enabled: true
+    secretName: intellmeet-tls
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
